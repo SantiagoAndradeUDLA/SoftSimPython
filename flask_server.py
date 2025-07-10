@@ -12,9 +12,22 @@ latest_data = {
 @app.route('/update', methods=['POST'])
 def update():
     global latest_data
-    content = request.get_json()
+    content = request.get_json(silent=True) # silent=True to prevent raising an exception on bad JSON
+    if content is None:
+        # This happens if the request body is not valid JSON or content-type is not application/json
+        print("Error: Received invalid JSON or incorrect content-type.")
+        return jsonify({"status": "error", "message": "Invalid JSON data or Content-Type header."}), 400
+    
+    # Basic validation: Check if expected keys are present (optional, but good practice)
+    expected_keys = ['voltaje', 'corriente', 'potencia', 'energia']
+    if not all(key in content for key in expected_keys):
+        print(f"Warning: Received data is missing some expected keys. Data: {content}")
+        # Decide if this is an error or just a warning. For now, accept partial data.
+        # return jsonify({"status": "error", "message": "Missing some data fields."}), 400
+
+    print(f"Received data: {content}") # Log received data
     latest_data.update(content)
-    return jsonify({"status": "ok"}), 200
+    return jsonify({"status": "ok", "message": "Data updated successfully."}), 200
 
 @app.route('/data', methods=['GET'])
 def get_data():

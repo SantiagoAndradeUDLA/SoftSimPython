@@ -6,7 +6,10 @@ import requests # Added for fetching data from Flask server
 import json     # Added for parsing JSON response
 
 # Flask server endpoint
-FLASK_SERVER_URL = "http://127.0.0.1:5000/data" # Default to localhost, user should change if server is elsewhere
+# IMPORTANT: If the Flask server is running on a different machine than this GUI,
+# replace "127.0.0.1" with the IP address of the machine running the Flask server.
+# For example: FLASK_SERVER_URL = "http://192.168.1.100:5000/data"
+FLASK_SERVER_URL = "http://127.0.0.1:5000/data" # Default to localhost
 
 # --- Indicador Circular Personalizado ---
 class CircularIndicator(QWidget):
@@ -95,10 +98,14 @@ class MonitorWidget(QWidget):
         indicators_layout.setAlignment(Qt.AlignCenter)
         indicators_layout.setSpacing(30)
 
-        self.volt_indicator = CircularIndicator("Voltaje", "V", max_value=240.0)
-        self.curr_indicator = CircularIndicator("Corriente", "A", max_value=20.0) # Ajusta max_value según tu caso
-        self.pow_indicator = CircularIndicator("Potencia", "W", max_value=5000.0) # Ajusta max_value
-        self.energy_indicator = CircularIndicator("Energía", "Wh", max_value=10000.0) # Energía acumulada puede tener un max muy grande
+        self.volt_indicator = CircularIndicator("Voltaje", "V", max_value=240.0) # Max typical household voltage
+        self.curr_indicator = CircularIndicator("Corriente", "A", max_value=20.0) # Max current for many circuit breakers
+        self.pow_indicator = CircularIndicator("Potencia", "W", max_value=5000.0) # Max power (e.g., 20A * 240V = 4800W)
+        # max_value for Energy is subjective. 10000Wh = 10kWh. 
+        # A typical household might use 10-30 kWh per day.
+        # This value might need adjustment based on how often the ESP32/PZEM energy counter is reset.
+        # If never reset, this max_value will be exceeded quickly.
+        self.energy_indicator = CircularIndicator("Energía", "Wh", max_value=10000.0) 
 
         indicators_layout.addWidget(self.volt_indicator)
         indicators_layout.addWidget(self.curr_indicator)
