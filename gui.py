@@ -2,10 +2,11 @@ from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QHBoxLayout, QApplicat
 from PyQt5.QtCore import QTimer, Qt, QRectF
 from PyQt5.QtGui import QPainter, QColor, QFont, QPen
 import sys
+import requests # Added for fetching data from Flask server
+import json     # Added for parsing JSON response
 
-# Asumiendo que get_fake_data proviene de data_simulator.py
-# (Necesitaré ver data_simulator.py para asegurar compatibilidad)
-from data_simulator import get_fake_data
+# Flask server endpoint
+FLASK_SERVER_URL = "http://127.0.0.1:5000/data" # Default to localhost, user should change if server is elsewhere
 
 # --- Indicador Circular Personalizado ---
 class CircularIndicator(QWidget):
@@ -76,7 +77,7 @@ class MonitorWidget(QWidget):
 
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_data)
-        self.timer.start(1000) # cada 1 segundo
+        self.timer.start(2000) # Update every 2 seconds to match ESP32 (or server update rate)
 
     def setup_ui(self):
         main_layout = QVBoxLayout(self)
@@ -161,17 +162,46 @@ class MonitorWidget(QWidget):
         """)
 
     def update_data(self):
-        data = get_fake_data()
-        self.volt_indicator.set_value(data['voltaje'])
-        self.curr_indicator.set_value(data['corriente'])
-        self.pow_indicator.set_value(data['potencia'])
-        self.energy_indicator.set_value(data['energia'])
+        try:
+            response = requests.get(FLASK_SERVER_URL)
+            response.raise_for_status()  # Raise an exception for HTTP errors (4xx or 5xx)
+            data = response.json()
 
-        # Actualizar también las etiquetas de texto para una vista detallada
-        self.volt_label.setText(f"Voltaje: {data['voltaje']:.2f} V")
-        self.curr_label.setText(f"Corriente: {data['corriente']:.2f} A")
-        self.pow_label.setText(f"Potencia: {data['potencia']:.2f} W")
-        self.energy_label.setText(f"Energía: {data['energia']:.2f} Wh")
+            # Default to 0 if a key is missing, to prevent crashes
+            voltaje = data.get('voltaje', 0.0)
+            corriente = data.get('corriente', 0.0)
+            potencia = data.get('potencia', 0.0)
+            energia = data.get('energia', 0.0) # Assuming server sends energy in Wh
+
+            self.volt_indicator.set_value(voltaje)
+            self.curr_indicator.set_value(corriente)
+            self.pow_indicator.set_value(potencia)
+            self.energy_indicator.set_value(energia)
+
+            # Actualizar también las etiquetas de texto para una vista detallada
+            self.volt_label.setText(f"Voltaje: {voltaje:.2f} V")
+            self.curr_label.setText(f"Corriente: {corriente:.2f} A")
+            self.pow_label.setText(f"Potencia: {potencia:.2f} W")
+            # Assuming 'energia' from server is already in Wh as per ESP32 sending logic
+            self.energy_label.setText(f"Energía: {energia:.2f} Wh") 
+
+        except requests.exceptions.RequestException as e:
+            print(f"Error fetching data from Flask server: {e}")
+            # Optionally, display an error message in the GUI or set values to a default/error state
+            self.volt_label.setText("Voltaje: Error")
+            self.curr_label.setText("Corriente: Error")
+            self.pow_label.setText("Potencia: Error")
+            self.energy_label.setText("Energía: Error")
+            # You might want to set indicators to 0 or a specific error visual
+            self.volt_indicator.set_value(0)
+            self.curr_indicator.set_value(0)
+            self.pow_indicator.set_value(0)
+            self.energy_indicator.set_value(0)
+        except json.JSONDecodeError:
+            print("Error: Could not decode JSON response from server.")
+            # Handle cases where the server response isn't valid JSON
+        except Exception as e:
+            print(f"An unexpected error occurred in update_data: {e}")
 
 
 if __name__ == '__main__':
